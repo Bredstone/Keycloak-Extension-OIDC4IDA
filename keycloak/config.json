@@ -1,0 +1,46 @@
+{
+    "realm": "OIDC4IDA",
+    "displayName": "OpenID Connect for Identity Assurance 1.0",
+    "enabled": true,
+    "clients": [ {
+        "clientId" : "ida-client",
+        "name" : "IDA Client",
+        "description" : "Test client for verified claims requests",
+        "clientAuthenticatorType" : "client-secret",
+        "secret" : "$(env:IDA_CLIENT_SECRET)",
+        "redirectUris" : [ "*" ],
+        "frontchannelLogout" : true,
+        "attributes" : {
+          "post.logout.redirect.uris" : "http://localhost/*##http://127.0.0.1/*"
+        },
+        "protocolMappers": [ {
+            "name": "IDA Mapper",
+            "protocol": "openid-connect",
+            "protocolMapper": "oidc-ida-mapper",
+            "consentRequired": false,
+            "config": {
+                "id.token.claim": "true",
+                "access.token.claim": "true",
+                "ida.local.source": "true",
+                "ida.external.store": "https://api.npoint.io/ae9b0d6aa0841db1f4ea",
+                "userinfo.token.claim": "true"
+            }
+        } ]
+    } ],
+    "users" : [ {
+        "username" : "ida_user",
+        "email" : "user@email.com",
+        "firstName" : "Jane",
+        "lastName" : "Doe",
+        "enabled" : true,
+        "credentials" : [ {
+          "type" : "password",
+          "value" : "123"
+        } ],
+        "attributes" : {
+            "gender" : [ "female" ],
+            "birthdate" : [ "1999-09-13" ],
+            "profile" : [ "https://janedoe.com.br" ]
+        }
+    } ]
+}

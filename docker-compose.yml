@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  keycloak:
+    build: ./keycloak
+    command: ["start-dev --log-level='INFO'"]
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: $KEYCLOAK_ADMIN_PASSWORD
+      KC_PROXY: edge
+      KC_HTTP_ENABLED: 'true'
+      KC_HOSTNAME_STRICT: 'false'
+    ports:
+      - 8080:8080
+
+  keycloak-config-cli:
+    image: adorsys/keycloak-config-cli:5.9.0-22.0.4
+    env_file:
+      - .env
+    environment:
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_USER: admin
+      KEYCLOAK_PASSWORD: $KEYCLOAK_ADMIN_PASSWORD
+      KEYCLOAK_AVAILABILITYCHECK_ENABLED: 'true'
+      IMPORT_VARSUBSTITUTION_ENABLED: 'true'
+      IMPORT_MANAGED_CLIENT: 'no-delete'
+      OIDC_REALM: OIDC4IDA
+    volumes:
+      - ./keycloak/config.json:/config/config.json
+    depends_on:
+      - keycloak
