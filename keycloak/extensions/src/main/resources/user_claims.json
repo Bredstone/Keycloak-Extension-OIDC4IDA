@@ -1,148 +1,15 @@
 {
     "verified_claims": {
-        "claims": {
-            "address": {
-                "country": "UK",
-                "locality": "Edinburgh",
-                "postal_code": "EH1 9GP",
-                "street_address": "122 Burns Crescent"
-            },
-            "birthdate": "1976-03-11",
-            "given_name": "Sarah",
-            "family_name": "Meredyth",
-            "place_of_birth": {
-                "country": "UK"
-            }
-        },
         "verification": {
-            "time": "2021-05-11T14:29Z",
-            "evidence": [
-                {
-                    "time": "2021-04-09T14:12Z",
-                    "type": "document",
-                    "check_details": [
-                        {
-                            "txn": "DL1-85762937582385820",
-                            "time": "2021-04-09T14:15Z",
-                            "check_method": "data",
-                            "organization": "DVLA"
-                        }
-                    ],
-                    "document_details": {
-                        "type": "driving_permit",
-                        "issuer": {
-                            "name": "DVLA",
-                            "country": "UK",
-                            "country_code": "GBR",
-                            "jurisdiction": "GB-GBN"
-                        },
-                        "serial_number": "ZG21000001",
-                        "date_of_expiry": "2030-12-31",
-                        "document_number": "MORGA753116SM9IJ35",
-                        "personal_number": "MORGA753116SM9IJ",
-                        "date_of_issuance": "2021-01-01"
-                    }
-                },
-                {
-                    "time": "2021-04-09T14:12Z",
-                    "type": "electronic_record",
-                    "record": {
-                        "type": "mortgage_account",
-                        "source": {
-                            "name": "TheCreditBureau"
-                        }
-                    },
-                    "check_details": [
-                        {
-                            "txn": "kbv1-hf934hn09234ng03jj3",
-                            "check_method": "kbv",
-                            "organization": "TheCreditBureau"
-                        }
-                    ]
-                },
-                {
-                    "time": "2021-04-09T14:12Z",
-                    "type": "electronic_record",
-                    "record": {
-                        "type": "bank_account",
-                        "source": {
-                            "name": "TheBank"
-                        }
-                    },
-                    "check_details": [
-                        {
-                            "txn": "kbv2-nm0f23u9459fj38u5j6",
-                            "check_method": "kbv",
-                            "organization": "OpenBankingTPP"
-                        }
-                    ]
-                },
-                {
-                    "time": "2021-04-09T15:42Z",
-                    "type": "electronic_record",
-                    "record": {
-                        "type": "mno",
-                        "source": {
-                            "name": "Vodafone"
-                        }
-                    },
-                    "check_details": [
-                        {
-                            "txn": "kbv3-jf9028h023hj0f9jh23",
-                            "check_method": "kbv",
-                            "organization": "GSMA"
-                        }
-                    ]
-                },
-                {
-                    "time": "2021-04-09T16:12Z",
-                    "type": "electronic_record",
-                    "record": {
-                        "type": "death_register",
-                        "source": {
-                            "name": "General Register Office",
-                            "country": "UK",
-                            "locality": "Southport",
-                            "postal_code": "PR8 2JD",
-                            "country_code": "GBR",
-                            "jurisdiction": "GB-EAW",
-                            "street_address": "PO BOX 2"
-                        }
-                    },
-                    "check_details": [
-                        {
-                            "txn": "GRO-9824hngvp9278hf5tmp924y5h",
-                            "check_method": "data",
-                            "organization": "GRO"
-                        }
-                    ]
-                },
-                {
-                    "time": "2021-04-09T16:51Z",
-                    "type": "electronic_record",
-                    "record": {
-                        "type": "fraud_register",
-                        "source": {
-                            "name": "National Fraud Database",
-                            "jurisdiction": "UK"
-                        }
-                    },
-                    "check_details": [
-                        {
-                            "txn": "fi-2nbf02hfn384ufn",
-                            "check_method": "data",
-                            "organization": "NextLex"
-                        }
-                    ]
-                }
-            ],
+            "trust_framework": "uk_diatf",
             "assurance_level": "medium",
-            "trust_framework": "uk_tfida",
             "assurance_process": {
                 "policy": "gpg45",
                 "procedure": "m1b",
                 "assurance_details": [
                     {
+                        "assurance_type": "evidence_validation",
+                        "assurance_classification": "score_2",
                         "evidence_ref": [
                             {
                                 "txn": "DL1-85762937582385820",
@@ -150,11 +17,11 @@
                                     "evidence_classification": "score_3_strength"
                                 }
                             }
-                        ],
-                        "assurance_type": "evidence_validation",
-                        "assurance_classification": "score_2"
+                        ]
                     },
                     {
+                        "assurance_type": "verification",
+                        "assurance_classification": "score_2",
                         "evidence_ref": [
                             {
                                 "txn": "kbv1-hf934hn09234ng03jj3",
@@ -174,11 +41,11 @@
                                     "evidence_classification": "medium_kbv"
                                 }
                             }
-                        ],
-                        "assurance_type": "verification",
-                        "assurance_classification": "score_2"
+                        ]
                     },
                     {
+                        "assurance_type": "counter_fraud",
+                        "assurance_classification": "score_2",
                         "evidence_ref": [
                             {
                                 "txn": "GRO-9824hngvp9278hf5tmp924y5h",
@@ -192,13 +59,146 @@
                                     "evidence_classification": "id_fraud"
                                 }
                             }
-                        ],
-                        "assurance_type": "counter_fraud",
-                        "assurance_classification": "score_2"
+                        ]
                     }
                 ]
             },
-            "verification_process": "7675D80F-57E0-AB14-9543-26B41FC22"
+            "time": "2021-05-11T14:29Z",
+            "verification_process": "7675D80F-57E0-AB14-9543-26B41FC22",
+            "evidence": [
+                {
+                    "type": "document",
+                    "check_details": [
+                        {
+                            "check_method": "data",
+                            "organization": "DVLA",
+                            "time": "2021-04-09T14:15Z",
+                            "txn": "DL1-85762937582385820"
+                        }
+                    ],
+                    "time": "2021-04-09T14:12Z",
+                    "document_details": {
+                        "type": "driving_permit",
+                        "personal_number": "MORGA753116SM9IJ",
+                        "document_number": "MORGA753116SM9IJ35",
+                        "serial_number": "ZG21000001",
+                        "date_of_issuance": "2021-01-01",
+                        "date_of_expiry": "2030-12-31",
+                        "issuer": {
+                            "name": "DVLA",
+                            "country": "UK",
+                            "country_code": "GBR",
+                            "jurisdiction": "GB-GBN"
+                        }
+                    }
+                },
+                {
+                    "type": "electronic_record",
+                    "check_details": [
+                        {
+                            "check_method": "kbv",
+                            "organization": "TheCreditBureau",
+                            "txn": "kbv1-hf934hn09234ng03jj3"
+                        }
+                    ],
+                    "time": "2021-04-09T14:12Z",
+                    "record": {
+                        "type": "mortgage_account",
+                        "source": {
+                            "name": "TheCreditBureau"
+                        }
+                    }
+                },
+                {
+                    "type": "electronic_record",
+                    "check_details": [
+                        {
+                            "check_method": "kbv",
+                            "organization": "OpenBankingTPP",
+                            "txn": "kbv2-nm0f23u9459fj38u5j6"
+                        }
+                    ],
+                    "time": "2021-04-09T14:12Z",
+                    "record": {
+                        "type": "bank_account",
+                        "source": {
+                            "name": "TheBank"
+                        }
+                    }
+                },
+                {
+                    "type": "electronic_record",
+                    "check_details": [
+                        {
+                            "check_method": "kbv",
+                            "organization": "GSMA",
+                            "txn": "kbv3-jf9028h023hj0f9jh23"
+                        }
+                    ],
+                    "time": "2021-04-09T15:42Z",
+                    "record": {
+                        "type": "mno",
+                        "source": {
+                            "name": "Vodafone"
+                        }
+                    }
+                },
+                {
+                    "type": "electronic_record",
+                    "check_details": [
+                        {
+                            "check_method": "data",
+                            "organization": "GRO",
+                            "txn": "GRO-9824hngvp9278hf5tmp924y5h"
+                        }
+                    ],
+                    "time": "2021-04-09T16:12Z",
+                    "record": {
+                        "type": "death_register",
+                        "source": {
+                            "name": "General Register Office",
+                            "street_address": "PO BOX 2",
+                            "locality": "Southport",
+                            "postal_code": "PR8 2JD",
+                            "country": "UK",
+                            "country_code": "GBR",
+                            "jurisdiction": "GB-EAW"
+                        }
+                    }
+                },
+                {
+                    "type": "electronic_record",
+                    "check_details": [
+                        {
+                            "check_method": "data",
+                            "organization": "NextLex",
+                            "txn": "fi-2nbf02hfn384ufn"
+                        }
+                    ],
+                    "time": "2021-04-09T16:51Z",
+                    "record": {
+                        "type": "fraud_register",
+                        "source": {
+                            "name": "National Fraud Database",
+                            "jurisdiction": "UK"
+                        }
+                    }
+                }
+            ]
+        },
+        "claims": {
+            "given_name": "Sarah",
+            "family_name": "Meredyth",
+            "birthdate": "1976-03-11",
+            "place_of_birth": {
+                "country": "UK"
+            },
+            "address": {
+                "locality": "Edinburgh",
+                "postal_code": "EH1 9GP",
+                "country": "UK",
+                "street_address": "122 Burns Crescent"
+            }
         }
     }
 }
