@@ -31,6 +31,7 @@ public class VerifiedClaimsValidator {
         } catch (IOException e) {
             // TODO Handle if this happens
             // This shouldn't happen
+
             LOG.error("Verified claims request's schema file not found!");
 
             e.printStackTrace();

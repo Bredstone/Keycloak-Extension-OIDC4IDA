@@ -1,6 +1,7 @@
 package org.keycloak.protocol.oidc.ida.mappers;
 
 import org.jboss.logging.Logger;
+import org.keycloak.OAuthErrorException;
 import org.keycloak.models.AuthenticatedClientSessionModel;
 import org.keycloak.models.ClientSessionContext;
 import org.keycloak.models.KeycloakSession;
@@ -10,9 +11,9 @@ import org.keycloak.models.ProtocolMapperModel;
 import org.keycloak.models.RealmModel;
 import org.keycloak.models.UserSessionModel;
 import org.keycloak.protocol.ProtocolMapperConfigException;
+import org.keycloak.protocol.ProtocolMapperUtils;
 import org.keycloak.protocol.oidc.OIDCLoginProtocol;
 import org.keycloak.protocol.oidc.ida.mappers.connector.IdaConnector;
-import org.keycloak.protocol.oidc.ida.mappers.extractor.VerifiedClaimExtractor;
 import org.keycloak.protocol.oidc.ida.mappers.util.VerifiedClaimsValidator;
 import org.keycloak.protocol.oidc.mappers.AbstractOIDCProtocolMapper;
 import org.keycloak.protocol.oidc.mappers.OIDCAccessTokenMapper;
@@ -22,22 +23,31 @@ import org.keycloak.protocol.oidc.mappers.UserInfoTokenMapper;
 import org.keycloak.provider.EnvironmentDependentProviderFactory;
 import org.keycloak.provider.ProviderConfigProperty;
 import org.keycloak.representations.IDToken;
+import org.keycloak.services.ErrorResponseException;
 
+import com.authlete.common.ida.DatasetExtractor;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import jakarta.ws.rs.core.Response;
+
 import net.jimblackler.jsonschemafriend.GenerationException;
 import net.jimblackler.jsonschemafriend.ValidationException;
 
 import java.io.IOException;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
+import static org.keycloak.protocol.oidc.ida.mappers.IdaConstants.CLAIMS;
+import static org.keycloak.protocol.oidc.ida.mappers.IdaConstants.ERROR_MESSAGE_CLAIMS_EMPTY;
 import static org.keycloak.protocol.oidc.ida.mappers.IdaConstants.ERROR_MESSAGE_REQUESTED_CLAIMS_EMPTY;
 import static org.keycloak.protocol.oidc.ida.mappers.IdaConstants.ERROR_MESSAGE_REQUESTED_CLAIMS_MALFORMED;
 import static org.keycloak.protocol.oidc.ida.mappers.IdaConstants.ERROR_MESSAGE_REQUESTED_CLAIMS_WRONG_TYPE;
+import static org.keycloak.protocol.oidc.ida.mappers.IdaConstants.ERROR_MESSAGE_VERIFIED_CLAIMS_EMPTY;
 import static org.keycloak.protocol.oidc.ida.mappers.IdaConstants.ERROR_MESSAGE_VERIFIED_CLAIMS_MALFORMED;
 import static org.keycloak.protocol.oidc.ida.mappers.IdaConstants.ERROR_MESSAGE_VERIFIED_CLAIMS_NOT_REQUESTED;
 import static org.keycloak.protocol.oidc.ida.mappers.IdaConstants.IDA_LOCAL_SOURCE_HELP_TEXT;
@@ -62,7 +72,6 @@ public class IdaProtocolMapper extends AbstractOIDCProtocolMapper implements OID
     private static final Logger LOG = Logger.getLogger(IdaProtocolMapper.class);
 
     private static final List<ProviderConfigProperty> configProperties = new ArrayList<>();
-
     static {
         OIDCAttributeMapperHelper.addIncludeInTokensConfig(configProperties, IdaProtocolMapper.class);
 
@@ -111,8 +120,9 @@ public class IdaProtocolMapper extends AbstractOIDCProtocolMapper implements OID
     @Override
     public void validateConfig(KeycloakSession session, RealmModel realm, ProtocolMapperContainerModel client,
             ProtocolMapperModel mapperModel) throws ProtocolMapperConfigException {
-        // If external source will be used then validates it
         if (!Boolean.parseBoolean(mapperModel.getConfig().get(IDA_LOCAL_SOURCE_NAME))) {
+        // If external source will be used then validates it
+
             IdaConnector idaConnector = session.getProvider(IdaConnector.class);
             idaConnector.validateIdaExternalStore(mapperModel.getConfig());   
         }
@@ -126,8 +136,9 @@ public class IdaProtocolMapper extends AbstractOIDCProtocolMapper implements OID
         AuthenticatedClientSessionModel acs = clientSessionCtx.getClientSession();
         String requestedString = acs.getNote(OIDCLoginProtocol.CLAIMS_PARAM);
         
-        // If no claims were requested, there is nothing to do
         if (requestedString == null) {
+        // If no claims were requested, then there is nothing to do
+
             LOG.debug(ERROR_MESSAGE_REQUESTED_CLAIMS_EMPTY);
             
             return;
@@ -136,36 +147,90 @@ public class IdaProtocolMapper extends AbstractOIDCProtocolMapper implements OID
         LOG.debugf("Requested claims string: %s", requestedString.replaceAll("\\s", ""));
 
         try {
-            // Current token type (userinfo or id_token)
-            String curEndpointKey = getEndpointKey(token.getType());
-
             // Parsing the requested claims to a JSON object
             ObjectMapper mapper = new ObjectMapper();
             mapper.enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
             mapper.enable(DeserializationFeature.FAIL_ON_READING_DUP_TREE_KEY);
             JsonNode requestedClaims = mapper.readTree(requestedString);
-            JsonNode requestedToken = requestedClaims.get(curEndpointKey);
 
+            // Current token type (userinfo or id_token)
+            String curEndpointKey = getEndpointKey(token.getType());
+            if (requestedClaims.get(curEndpointKey) == null) {
             // If the current token is not of a requested type, return
-            if (requestedToken == null) {
+
                 LOG.debugf(ERROR_MESSAGE_REQUESTED_CLAIMS_WRONG_TYPE, curEndpointKey);
             
                 return;
             }
 
-            // If there are no verified claims requested, return
-            if (requestedToken.get(VERIFIED_CLAIMS) == null) {
+            // The requested verified_claims JSON object
+            JsonNode requestedVerifiedClaims = requestedClaims.get(curEndpointKey).get(VERIFIED_CLAIMS);
+
+            if (requestedVerifiedClaims == null) {
+            // If there were no verified claims requested, return
+
                 LOG.debug(ERROR_MESSAGE_VERIFIED_CLAIMS_NOT_REQUESTED);
-            
+                
                 return;
+            }
+
+            if (requestedVerifiedClaims.isArray()) {
+            // If multiple verified_claims objects were requested
+
+                requestedVerifiedClaims.elements().forEachRemaining(entry -> assertClaimsNotEmpty(entry));
+            } else {
+            // If a single verified_claims objects was requested
+
+                assertClaimsNotEmpty(requestedVerifiedClaims);
             }
 
             // Validates the request using a JSON schema 
             VerifiedClaimsValidator.validateVerifiedClaimsRequest(requestedClaims);
 
-            // Aqui é tudo teste
-            JsonNode userVerifiedClaims = mapper.readTree(IdaProtocolMapper.class.getResourceAsStream("/user_claims.json"));
-            VerifiedClaimExtractor.getVerifiedClaims(requestedToken, userVerifiedClaims);
+            final JsonNode[] userVerifiedClaims = { null };
+            if (!Boolean.parseBoolean(mappingModel.getConfig().get(IDA_LOCAL_SOURCE_NAME))) {
+            // If external source will be used then validates it
+
+                IdaConnector idaConnector = keycloakSession.getProvider(IdaConnector.class); 
+                userVerifiedClaims[0] = mapper.convertValue(idaConnector.getVerifiedClaims(mappingModel.getConfig(), userSession.getUser().getUsername()), JsonNode.class).get(VERIFIED_CLAIMS);
+            } else {
+                // TODO Pegar dos atributos do usuário
+                userVerifiedClaims[0] = mapper.readTree(IdaProtocolMapper.class.getResourceAsStream("/user_claims.json")).get(VERIFIED_CLAIMS);
+            }
+
+            List<Map<String, Object>> extractedClaims = new ArrayList<Map<String, Object>>();
+            if (requestedVerifiedClaims.isArray()) {
+            // If multiple verified_claims objects were requested
+
+                requestedVerifiedClaims.elements().forEachRemaining(entry -> extractClaims(entry, userVerifiedClaims[0], extractedClaims));
+            } else {
+            // If a single verified_claims objects was requested
+
+                extractClaims(requestedVerifiedClaims, userVerifiedClaims[0], extractedClaims);
+            }
+            
+            if (extractedClaims.isEmpty()) {
+            // If the resulting verified claims object is null, return
+                
+                LOG.debug(ERROR_MESSAGE_VERIFIED_CLAIMS_EMPTY);
+
+                return;
+            }
+
+            extractedClaims.forEach(entry -> {LOG.infof("Resulting verified claims object: %s", entry.toString());});
+
+            // Adding the verified_claims property to token
+            mappingModel.getConfig().put(OIDCAttributeMapperHelper.TOKEN_CLAIM_NAME, VERIFIED_CLAIMS);
+            if (extractedClaims.size() > 1) {
+            // If multiple verified_claims objects were requested
+
+                mappingModel.getConfig().put(ProtocolMapperUtils.MULTIVALUED, "true");
+                OIDCAttributeMapperHelper.mapClaim(token, mappingModel, extractedClaims);
+            } else {
+            // If multiple only one verified_claims object was requested
+
+                OIDCAttributeMapperHelper.mapClaim(token, mappingModel, extractedClaims.get(0));
+            }
         } catch (JsonProcessingException e) {
             LOG.warn(ERROR_MESSAGE_REQUESTED_CLAIMS_MALFORMED);
 
@@ -176,34 +241,35 @@ public class IdaProtocolMapper extends AbstractOIDCProtocolMapper implements OID
 
             return;
         } catch (IOException e) {
-            // TODO Tirar isso daqui
+            // TODO Auto-generated catch block
             e.printStackTrace();
         }
+    }
 
-        // if (!requestClaims.isEmpty()) {
-        //     // Retrieving Verified Claims for a user from an external store
-        //     IdaConnector idaConnector = keycloakSession.getProvider(IdaConnector.class);
-        //     Map<String, Object> userAllClaims = idaConnector.getVerifiedClaims(mappingModel.getConfig(),
-        //             userSession.getUser().getUsername());
-        //     // Filtering request claims from validated claims in an external store
-        //     List<Map<String, Object>> extractedClaims = new ArrayList<>();
-        //     for (Map<String, Object> requestClaim : requestClaims) {
-        //         Map<String, Object> extractedClaim = new VerifiedClaimExtractor(OffsetDateTime.now())
-        //                 .getFilteredClaims(requestClaim, userAllClaims);
-        //         extractedClaims.add(extractedClaim);
-        //     }
-        //     // Mapping filtering results to output
-        //     mappingModel.getConfig().put(TOKEN_CLAIM_NAME, VERIFIED_CLAIMS);
+    @SuppressWarnings("unchecked")
+    private void extractClaims(JsonNode request, JsonNode userClaims, List<Map<String, Object>> resultingList) {
+        ObjectMapper mapper = new ObjectMapper();
+        Map<String, Object> extracted = new DatasetExtractor().extract(
+            mapper.convertValue(request, Map.class), 
+            mapper.convertValue(userClaims, Map.class));
 
-        //     if (isArray(extractedClaims)) {
-        //         // verified Claims is array.
-        //         mappingModel.getConfig().put(ProtocolMapperUtils.MULTIVALUED, "true");
-        //         OIDCAttributeMapperHelper.mapClaim(token, mappingModel, extractedClaims);
-        //     } else {
-        //         // verified Claims is single value.
-        //         OIDCAttributeMapperHelper.mapClaim(token, mappingModel, extractedClaims.get(0));
-        //     }
-        // }
+        if (extracted != null && !extracted.isEmpty()) {
+        // If the claims were extracted succesfully
+
+            resultingList.add(extracted);
+        }
+    }
+
+    private void assertClaimsNotEmpty(JsonNode verifiedClaims) {
+        if (verifiedClaims.get(CLAIMS) != null && verifiedClaims.get(CLAIMS).isObject() && verifiedClaims.get(CLAIMS).isEmpty()) {
+        // If the claims sub-element is empty, abort the transaction with an invalid_request error
+
+            LOG.debug(ERROR_MESSAGE_CLAIMS_EMPTY);
+            
+            throw new ErrorResponseException(OAuthErrorException.INVALID_REQUEST, 
+                ERROR_MESSAGE_CLAIMS_EMPTY, 
+                Response.Status.BAD_REQUEST);
+        }
     }
 
     /**

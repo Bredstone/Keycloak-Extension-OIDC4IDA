@@ -1,8 +1,6 @@
 package org.keycloak.protocol.oidc.ida.mappers.connector;
 
 import com.fasterxml.jackson.core.JsonParseException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.exc.MismatchedInputException;
 import jakarta.ws.rs.core.Response;
 import org.apache.http.conn.HttpHostConnectException;
@@ -15,11 +13,8 @@ import org.keycloak.protocol.ProtocolMapperConfigException;
 import org.keycloak.provider.ProviderConfigProperty;
 import org.keycloak.services.ErrorResponseException;
 
-import java.io.File;
 import java.io.IOException;
-import java.net.MalformedURLException;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.net.UnknownHostException;
 import java.util.List;
 import java.util.Map;

@@ -14,6 +14,7 @@
         <jackson.version>2.16.0-rc1</jackson.version>
         <jsonSchemaFriend.version>0.12.2</jsonSchemaFriend.version>
         <java-jq.version>1.3.0</java-jq.version>
+        <authlete-java-common.version>3.85</authlete-java-common.version>
         <maven.compiler.release>11</maven.compiler.release>
         <maven.compiler.source>11</maven.compiler.source>
         <maven.compiler.target>11</maven.compiler.target>
@@ -31,7 +32,7 @@
         <repository>
             <id>central</id>
             <name>Central Repository</name>
-            <url>http://repo.maven.apache.org/maven2</url>
+            <url>https://repo1.maven.org/maven2/</url>
             <releases>
                 <enabled>true</enabled>
             </releases>
@@ -84,6 +85,12 @@
             <artifactId>java-jq</artifactId>
             <version>${java-jq.version}</version>
         </dependency>
+
+        <dependency>
+            <groupId>com.authlete</groupId>
+            <artifactId>authlete-java-common</artifactId>
+            <version>${authlete-java-common.version}</version>
+        </dependency>        
     </dependencies>
 
     <build>

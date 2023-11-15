@@ -21,7 +21,9 @@ package org.keycloak.representations;
 import java.util.List;
 import java.util.Map;
 
+import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.JsonNode;
 
 /**
  * Claims parameter as described in the OIDC specification https://openid.net/specs/openid-connect-core-1_0.html#ClaimsParameter
@@ -31,24 +33,24 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 public class ClaimsRepresentation {
 
     @JsonProperty("id_token")
-    private Map<String, ClaimValue> idTokenClaims;
+    private Map<String, Object> idTokenClaims;
 
     @JsonProperty("userinfo")
-    private Map<String, ClaimValue> userinfoClaims;
+    private Map<String, Object> userinfoClaims;
 
-    public Map<String, ClaimValue> getIdTokenClaims() {
+    public Map<String, Object> getIdTokenClaims() {
         return idTokenClaims;
     }
 
-    public void setIdTokenClaims(Map<String, ClaimValue> idTokenClaims) {
+    public void setIdTokenClaims(Map<String, Object> idTokenClaims) {
         this.idTokenClaims = idTokenClaims;
     }
 
-    public Map<String, ClaimValue> getUserinfoClaims() {
+    public Map<String, Object> getUserinfoClaims() {
         return userinfoClaims;
     }
 
-    public void setUserinfoClaims(Map<String, ClaimValue> userinfoClaims) {
+    public void setUserinfoClaims(Map<String, Object> userinfoClaims) {
         this.userinfoClaims = userinfoClaims;
     }
 
@@ -122,9 +124,8 @@ public class ClaimsRepresentation {
 
         private List<CLAIM_TYPE> values;
 
-        private Map<String, Object> verification;
-
-        private Map<String, Object> claims;
+        @JsonAnySetter
+        private JsonNode verified_claims;
 
         public Boolean getEssential() {
             return essential;
@@ -154,20 +155,12 @@ public class ClaimsRepresentation {
             this.values = values;
         }
 
-        public Map<String, Object> getVerification() {
-            return verification;
+        public JsonNode getVerifiedClaims() {
+            return verified_claims;
         }
 
-        public void setVerification(Map<String, Object> verification) {
-            this.verification = verification;
-        }
-
-        public Map<String, Object> getClaims() {
-            return claims;
-        }
-
-        public void setClaims(Map<String, Object> claims) {
-            this.claims = claims;
+        public void setVerifiedClaims(JsonNode verified_claims) {
+            this.verified_claims = verified_claims;
         }
     }
 }

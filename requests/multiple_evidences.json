@@ -1,0 +1,33 @@
+{
+    "userinfo": {
+        "verified_claims": [
+            {
+                "verification": {
+                    "trust_framework": { "value": "uk_diatf" },
+                    "evidence": [ {
+                        "type": { "value": "document" }
+                    } ]
+                },
+                "claims": {
+                    "given_name": null,
+                    "family_name": null
+                }
+            },
+            {
+                "verification": {
+                    "trust_framework": { "value": "uk_diatf" },
+                    "evidence": [ {
+                        "type": { "value": "electronic_record" },
+                        "record": {
+                            "type": { "value": "bank_account" }
+                        }
+                    } ]
+                },
+                "claims": {
+                    "given_name": null,
+                    "family_name": null
+                }
+            }
+        ]
+    }
+}

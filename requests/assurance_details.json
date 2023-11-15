@@ -1,0 +1,23 @@
+{
+    "userinfo": {
+        "verified_claims": {
+            "verification": {
+                "trust_framework": null,
+                "assurance_process": {
+                    "assurance_details": [
+                        {
+                            "assurance_type": {
+                                "value": "verification"
+                            }
+                        }
+                    ]
+                }
+            },
+            "claims": {
+                "given_name": null,
+                "family_name": null,
+                "birthdate": null
+            }
+        }
+    }
+}
