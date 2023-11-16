@@ -21,7 +21,7 @@
             "config": {
                 "id.token.claim": "true",
                 "access.token.claim": "true",
-                "ida.local.source": "true",
+                "ida.local.source": "false",
                 "ida.external.store": "https://api.npoint.io/ae9b0d6aa0841db1f4ea",
                 "userinfo.token.claim": "true"
             }

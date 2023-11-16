@@ -3,6 +3,8 @@ package org.keycloak.protocol.oidc.ida.mappers.connector;
 import org.keycloak.Config;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.KeycloakSessionFactory;
+import org.keycloak.protocol.oidc.ida.mappers.connector.spi.IdaConnector;
+import org.keycloak.protocol.oidc.ida.mappers.connector.spi.IdaConnectorFactory;
 
 public class IdaHttpConnectorFactory implements IdaConnectorFactory {
 

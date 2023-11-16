@@ -1,17 +1,20 @@
 package org.keycloak.protocol.oidc.ida.mappers.connector;
 
 import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.exc.MismatchedInputException;
-import jakarta.ws.rs.core.Response;
+import net.jimblackler.jsonschemafriend.GenerationException;
+import net.jimblackler.jsonschemafriend.ValidationException;
+
 import org.apache.http.conn.HttpHostConnectException;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.jboss.logging.Logger;
-import org.keycloak.OAuthErrorException;
 import org.keycloak.broker.provider.util.SimpleHttp;
 import org.keycloak.protocol.ProtocolMapperConfigException;
+import org.keycloak.protocol.oidc.ida.mappers.connector.spi.IdaConnector;
+import org.keycloak.protocol.oidc.ida.mappers.util.VerifiedClaimsValidator;
 import org.keycloak.provider.ProviderConfigProperty;
-import org.keycloak.services.ErrorResponseException;
 
 import java.io.IOException;
 import java.net.URI;
@@ -19,9 +22,10 @@ import java.net.UnknownHostException;
 import java.util.List;
 import java.util.Map;
 
-import static org.keycloak.protocol.oidc.ida.mappers.IdaConstants.ERROR_MESSAGE_CONNECT_IDA_EXTERNAL_STORE_ERROR;
-import static org.keycloak.protocol.oidc.ida.mappers.IdaConstants.ERROR_MESSAGE_IDA_EXTERNAL_STORE_JSON_SYNTAX_ERROR_ERROR;
-import static org.keycloak.protocol.oidc.ida.mappers.IdaConstants.ERROR_MESSAGE_IDA_EXTERNAL_STORE_NOT_SPECIFIED;
+import static org.keycloak.protocol.oidc.ida.mappers.connector.IdaHttpConnectorConstants.ERROR_MESSAGE_IDA_EXTERNAL_STORE_CONNECTION;
+import static org.keycloak.protocol.oidc.ida.mappers.connector.IdaHttpConnectorConstants.ERROR_MESSAGE_IDA_EXTERNAL_STORE_JSON_STRUCTURE;
+import static org.keycloak.protocol.oidc.ida.mappers.connector.IdaHttpConnectorConstants.ERROR_MESSAGE_IDA_EXTERNAL_STORE_NOT_SPECIFIED;
+import static org.keycloak.protocol.oidc.ida.mappers.connector.IdaHttpConnectorConstants.ERROR_MESSAGE_IDA_EXTERNAL_STORE_SCHEMA_VALIDATION;
 import static org.keycloak.validate.validators.NotBlankValidator.MESSAGE_BLANK;
 import static org.keycloak.validate.validators.UriValidator.MESSAGE_INVALID_URI;
 
@@ -29,7 +33,8 @@ import static org.keycloak.validate.validators.UriValidator.MESSAGE_INVALID_URI;
  * Connector that uses HTTP to retrieve validated claims from an external store
  */
 public class IdaHttpConnector implements IdaConnector {
-    private static final Logger logger = Logger.getLogger(IdaHttpConnector.class);
+    private static final Logger LOG = Logger.getLogger(IdaHttpConnector.class);
+
     public static final String IDA_EXTERNAL_STORE_HELP_TEXT = "The URI of external store used by IDA (only if local source is disabled)";
     public static final String ERROR_MESSAGE_INVALID_IDA_EXTERNAL_STORE = "Invalid URI of IDA external store.";
 
@@ -48,9 +53,13 @@ public class IdaHttpConnector implements IdaConnector {
             throws ProtocolMapperConfigException {
         String externalStoreUrl = protocolMapperConfig.get(IDA_EXTERNAL_STORE_NAME);
         if (externalStoreUrl == null || externalStoreUrl.isEmpty()) {
+        // If no URL was provided
+
             throw new ProtocolMapperConfigException(ERROR_MESSAGE_IDA_EXTERNAL_STORE_NOT_SPECIFIED, MESSAGE_BLANK);
         }
+
         try {
+            // Validating the URL
             new URI(externalStoreUrl).toURL();
         } catch (Exception e) {
             throw new ProtocolMapperConfigException(ERROR_MESSAGE_INVALID_IDA_EXTERNAL_STORE, MESSAGE_INVALID_URI, e);
@@ -58,30 +67,46 @@ public class IdaHttpConnector implements IdaConnector {
     }
 
     @Override
-    public Map<String, Object> getVerifiedClaims(Map<String, String> protocolMapperConfig, String userId) {
+    public JsonNode getVerifiedClaims(Map<String, String> protocolMapperConfig, String userId) {
         String externalStoreUrl = protocolMapperConfig.get(IDA_EXTERNAL_STORE_NAME);
         try (CloseableHttpClient client = HttpClientBuilder.create().build()) {
-            SimpleHttp request = SimpleHttp.doGet(externalStoreUrl + "?userId=" + userId,
-                    client);
+            // Retrieving user's verified_claims object from the external store
+            SimpleHttp request = SimpleHttp.doGet(externalStoreUrl + "?userId=" + userId, client);
             
-            // logger.infof("Retrieved verified claims from HTTP source:\n" + request.asString());
+            LOG.debugf("Retrieved verified claims from HTTP source: %s", request.asString());
+            
+            // Convert the verified_claims object to a JSON representation
+            JsonNode verifiedClaims = request.asJson();
+            // Validates the verified_claims object using a JSON schema
+            VerifiedClaimsValidator.validateVerifiedClaims(verifiedClaims);
 
-            return request.asJson(Map.class);
+            return verifiedClaims;
         } catch (IOException e) {
+        // If something went wrong during the verified_claims retrieving process
+        // These errors should not concern client applications
+        // However, they will be logged into Keycloak's terminal, so admin could be aware that something is wrong
+
             if (e instanceof UnknownHostException || e instanceof HttpHostConnectException) {
-                logger.errorf(e, ERROR_MESSAGE_CONNECT_IDA_EXTERNAL_STORE_ERROR + " IDA External Store='%s'",
-                        externalStoreUrl);
-                throw new ErrorResponseException(OAuthErrorException.SERVER_ERROR,
-                        ERROR_MESSAGE_CONNECT_IDA_EXTERNAL_STORE_ERROR,
-                        Response.Status.INTERNAL_SERVER_ERROR);
+            // If the external store couldn't be found
+
+                LOG.errorf(ERROR_MESSAGE_IDA_EXTERNAL_STORE_CONNECTION + " IDA External Store = '%s'", externalStoreUrl);
             } else if (e instanceof MismatchedInputException || e instanceof JsonParseException) {
-                logger.errorf(e, ERROR_MESSAGE_IDA_EXTERNAL_STORE_JSON_SYNTAX_ERROR_ERROR);
-                throw new ErrorResponseException(OAuthErrorException.SERVER_ERROR,
-                        ERROR_MESSAGE_IDA_EXTERNAL_STORE_JSON_SYNTAX_ERROR_ERROR,
-                        Response.Status.INTERNAL_SERVER_ERROR);
-            } else {
-                throw new RuntimeException(e);
+            // If the user's verified_claims is not in a valid JSON structure
+
+                LOG.errorf(ERROR_MESSAGE_IDA_EXTERNAL_STORE_JSON_STRUCTURE);
             }
+
+            e.printStackTrace();
+            return null;
+        } catch (ValidationException | GenerationException e) {
+        // If something went wrong during the verified_claims validation process
+        // These errors should not concern client applications
+        // However, they will be logged into Keycloak's terminal, so admin could be aware that something is wrong
+
+            LOG.error(ERROR_MESSAGE_IDA_EXTERNAL_STORE_SCHEMA_VALIDATION);
+
+            e.printStackTrace();
+            return null;
         }
     }
 

@@ -13,7 +13,7 @@ import org.keycloak.models.UserSessionModel;
 import org.keycloak.protocol.ProtocolMapperConfigException;
 import org.keycloak.protocol.ProtocolMapperUtils;
 import org.keycloak.protocol.oidc.OIDCLoginProtocol;
-import org.keycloak.protocol.oidc.ida.mappers.connector.IdaConnector;
+import org.keycloak.protocol.oidc.ida.mappers.connector.spi.IdaConnector;
 import org.keycloak.protocol.oidc.ida.mappers.util.VerifiedClaimsValidator;
 import org.keycloak.protocol.oidc.mappers.AbstractOIDCProtocolMapper;
 import org.keycloak.protocol.oidc.mappers.OIDCAccessTokenMapper;
@@ -37,7 +37,6 @@ import net.jimblackler.jsonschemafriend.GenerationException;
 import net.jimblackler.jsonschemafriend.ValidationException;
 
 import java.io.IOException;
-import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -46,10 +45,11 @@ import static org.keycloak.protocol.oidc.ida.mappers.IdaConstants.CLAIMS;
 import static org.keycloak.protocol.oidc.ida.mappers.IdaConstants.ERROR_MESSAGE_CLAIMS_EMPTY;
 import static org.keycloak.protocol.oidc.ida.mappers.IdaConstants.ERROR_MESSAGE_REQUESTED_CLAIMS_EMPTY;
 import static org.keycloak.protocol.oidc.ida.mappers.IdaConstants.ERROR_MESSAGE_REQUESTED_CLAIMS_MALFORMED;
-import static org.keycloak.protocol.oidc.ida.mappers.IdaConstants.ERROR_MESSAGE_REQUESTED_CLAIMS_WRONG_TYPE;
+import static org.keycloak.protocol.oidc.ida.mappers.IdaConstants.ERROR_MESSAGE_REQUESTED_CLAIMS_TOKEN_TYPE;
+import static org.keycloak.protocol.oidc.ida.mappers.IdaConstants.ERROR_MESSAGE_REQUESTED_VERIFIED_CLAIMS_MALFORMED;
+import static org.keycloak.protocol.oidc.ida.mappers.IdaConstants.ERROR_MESSAGE_REQUESTED_VERIFIED_CLAIMS_NOT_REQUESTED;
+import static org.keycloak.protocol.oidc.ida.mappers.IdaConstants.ERROR_MESSAGE_USER_VERIFIED_CLAIMS_EMPTY;
 import static org.keycloak.protocol.oidc.ida.mappers.IdaConstants.ERROR_MESSAGE_VERIFIED_CLAIMS_EMPTY;
-import static org.keycloak.protocol.oidc.ida.mappers.IdaConstants.ERROR_MESSAGE_VERIFIED_CLAIMS_MALFORMED;
-import static org.keycloak.protocol.oidc.ida.mappers.IdaConstants.ERROR_MESSAGE_VERIFIED_CLAIMS_NOT_REQUESTED;
 import static org.keycloak.protocol.oidc.ida.mappers.IdaConstants.IDA_LOCAL_SOURCE_HELP_TEXT;
 import static org.keycloak.protocol.oidc.ida.mappers.IdaConstants.IDA_LOCAL_SOURCE_LABEL;
 import static org.keycloak.protocol.oidc.ida.mappers.IdaConstants.IDA_LOCAL_SOURCE_NAME;
@@ -148,9 +148,9 @@ public class IdaProtocolMapper extends AbstractOIDCProtocolMapper implements OID
 
         try {
             // Parsing the requested claims to a JSON object
-            ObjectMapper mapper = new ObjectMapper();
-            mapper.enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
-            mapper.enable(DeserializationFeature.FAIL_ON_READING_DUP_TREE_KEY);
+            ObjectMapper mapper = new ObjectMapper()
+                .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+                .enable(DeserializationFeature.FAIL_ON_READING_DUP_TREE_KEY);
             JsonNode requestedClaims = mapper.readTree(requestedString);
 
             // Current token type (userinfo or id_token)
@@ -158,7 +158,7 @@ public class IdaProtocolMapper extends AbstractOIDCProtocolMapper implements OID
             if (requestedClaims.get(curEndpointKey) == null) {
             // If the current token is not of a requested type, return
 
-                LOG.debugf(ERROR_MESSAGE_REQUESTED_CLAIMS_WRONG_TYPE, curEndpointKey);
+                LOG.debugf(ERROR_MESSAGE_REQUESTED_CLAIMS_TOKEN_TYPE, curEndpointKey);
             
                 return;
             }
@@ -169,7 +169,7 @@ public class IdaProtocolMapper extends AbstractOIDCProtocolMapper implements OID
             if (requestedVerifiedClaims == null) {
             // If there were no verified claims requested, return
 
-                LOG.debug(ERROR_MESSAGE_VERIFIED_CLAIMS_NOT_REQUESTED);
+                LOG.debug(ERROR_MESSAGE_REQUESTED_VERIFIED_CLAIMS_NOT_REQUESTED);
                 
                 return;
             }
@@ -192,42 +192,50 @@ public class IdaProtocolMapper extends AbstractOIDCProtocolMapper implements OID
             // If external source will be used then validates it
 
                 IdaConnector idaConnector = keycloakSession.getProvider(IdaConnector.class); 
-                userVerifiedClaims[0] = mapper.convertValue(idaConnector.getVerifiedClaims(mappingModel.getConfig(), userSession.getUser().getUsername()), JsonNode.class).get(VERIFIED_CLAIMS);
+                userVerifiedClaims[0] = idaConnector.getVerifiedClaims(mappingModel.getConfig(), userSession.getUser().getUsername());
             } else {
                 // TODO Pegar dos atributos do usuário
-                userVerifiedClaims[0] = mapper.readTree(IdaProtocolMapper.class.getResourceAsStream("/user_claims.json")).get(VERIFIED_CLAIMS);
+                userVerifiedClaims[0] = mapper.readTree(IdaProtocolMapper.class.getResourceAsStream("/user_claims.json"));
             }
 
-            List<Map<String, Object>> extractedClaims = new ArrayList<Map<String, Object>>();
-            if (requestedVerifiedClaims.isArray()) {
-            // If multiple verified_claims objects were requested
-
-                requestedVerifiedClaims.elements().forEachRemaining(entry -> extractClaims(entry, userVerifiedClaims[0], extractedClaims));
-            } else {
-            // If a single verified_claims objects was requested
-
-                extractClaims(requestedVerifiedClaims, userVerifiedClaims[0], extractedClaims);
-            }
-            
-            if (extractedClaims.isEmpty()) {
-            // If the resulting verified claims object is null, return
+            if (userVerifiedClaims[0] == null || userVerifiedClaims[0].get(VERIFIED_CLAIMS) == null) {
+            // If the user's verified_claims object could not be retrieved
                 
-                LOG.debug(ERROR_MESSAGE_VERIFIED_CLAIMS_EMPTY);
+                LOG.debug(ERROR_MESSAGE_USER_VERIFIED_CLAIMS_EMPTY);
 
                 return;
             }
 
-            extractedClaims.forEach(entry -> {LOG.infof("Resulting verified claims object: %s", entry.toString());});
+            userVerifiedClaims[0] = userVerifiedClaims[0].get(VERIFIED_CLAIMS);
+            List<Map<String, Object>> extractedClaims = new ArrayList<Map<String, Object>>();
+            extractClaims(
+                requestedVerifiedClaims.isArray() 
+                    ? mapper.convertValue(requestedVerifiedClaims, List.class) 
+                    : mapper.convertValue(requestedVerifiedClaims, Map.class), 
+                userVerifiedClaims[0].isArray() 
+                    ? mapper.convertValue(userVerifiedClaims[0], List.class) 
+                    : mapper.convertValue(userVerifiedClaims[0], Map.class), 
+                extractedClaims);
+            
+            if (extractedClaims.isEmpty()) {
+            // If the resulting verified claims object is null, return
+                
+                LOG.warn(ERROR_MESSAGE_VERIFIED_CLAIMS_EMPTY);
+
+                return;
+            }
+
+            extractedClaims.forEach(entry -> LOG.debugf("Resulting verified claims object: %s", entry.toString()));
 
             // Adding the verified_claims property to token
             mappingModel.getConfig().put(OIDCAttributeMapperHelper.TOKEN_CLAIM_NAME, VERIFIED_CLAIMS);
             if (extractedClaims.size() > 1) {
-            // If multiple verified_claims objects were requested
+            // If multiple verified_claims objects were extracted
 
                 mappingModel.getConfig().put(ProtocolMapperUtils.MULTIVALUED, "true");
                 OIDCAttributeMapperHelper.mapClaim(token, mappingModel, extractedClaims);
             } else {
-            // If multiple only one verified_claims object was requested
+            // If a single verified_claims object was extracted
 
                 OIDCAttributeMapperHelper.mapClaim(token, mappingModel, extractedClaims.get(0));
             }
@@ -236,7 +244,7 @@ public class IdaProtocolMapper extends AbstractOIDCProtocolMapper implements OID
 
             return;
         } catch (GenerationException | ValidationException e) {
-            LOG.warn(ERROR_MESSAGE_VERIFIED_CLAIMS_MALFORMED);
+            LOG.warn(ERROR_MESSAGE_REQUESTED_VERIFIED_CLAIMS_MALFORMED);
             LOG.warn(e.getMessage());
 
             return;
@@ -246,20 +254,47 @@ public class IdaProtocolMapper extends AbstractOIDCProtocolMapper implements OID
         }
     }
 
+    /**
+     * Try to extracts the verified_claims request from user's all verified claims set and put them into a list
+     * 
+     * @param request
+     * @param userClaims
+     * @param resultingList
+     */
     @SuppressWarnings("unchecked")
-    private void extractClaims(JsonNode request, JsonNode userClaims, List<Map<String, Object>> resultingList) {
-        ObjectMapper mapper = new ObjectMapper();
-        Map<String, Object> extracted = new DatasetExtractor().extract(
-            mapper.convertValue(request, Map.class), 
-            mapper.convertValue(userClaims, Map.class));
+    private void extractClaims(Object request, Object userClaims, List<Map<String, Object>> resultingList) {
+        if (request instanceof List) {
+        // If request object is a list
+
+            ((List<Map<String,Object>>) request).forEach(entry -> extractClaims(entry, userClaims, resultingList));
+            
+            return;
+        }
+
+        if (userClaims instanceof List) {
+        // If userClaims object is a list
+
+            ((List<Map<String,Object>>) userClaims).forEach(entry -> extractClaims(request, entry, resultingList));
+
+            return;
+        }
+
+        // Extracts the claims
+        Map<String, Object> extracted = 
+            new DatasetExtractor().extract((Map<String, Object>) request, (Map<String, Object>) userClaims);
 
         if (extracted != null && !extracted.isEmpty()) {
         // If the claims were extracted succesfully
 
-            resultingList.add(extracted);
+            resultingList.add(extracted); // Adds the claims to resultingList
         }
     }
 
+    /**
+     * Inspects each verified_claims object and assure that the claims sub-element is not empty
+     * 
+     * @param verifiedClaims
+     */
     private void assertClaimsNotEmpty(JsonNode verifiedClaims) {
         if (verifiedClaims.get(CLAIMS) != null && verifiedClaims.get(CLAIMS).isObject() && verifiedClaims.get(CLAIMS).isEmpty()) {
         // If the claims sub-element is empty, abort the transaction with an invalid_request error
