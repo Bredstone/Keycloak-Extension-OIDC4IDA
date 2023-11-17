@@ -9,6 +9,7 @@ import org.keycloak.models.KeycloakSessionFactory;
 import org.keycloak.models.ProtocolMapperContainerModel;
 import org.keycloak.models.ProtocolMapperModel;
 import org.keycloak.models.RealmModel;
+import org.keycloak.models.UserModel;
 import org.keycloak.models.UserSessionModel;
 import org.keycloak.protocol.ProtocolMapperConfigException;
 import org.keycloak.protocol.ProtocolMapperUtils;
@@ -30,6 +31,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 
 import jakarta.ws.rs.core.Response;
 
@@ -39,6 +41,7 @@ import net.jimblackler.jsonschemafriend.ValidationException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import static org.keycloak.protocol.oidc.ida.mappers.IdaConstants.CLAIMS;
 import static org.keycloak.protocol.oidc.ida.mappers.IdaConstants.ERROR_MESSAGE_CLAIMS_EMPTY;
@@ -188,17 +191,10 @@ public class IdaProtocolMapper extends AbstractOIDCProtocolMapper implements OID
 
                 IdaConnector idaConnector = keycloakSession.getProvider(IdaConnector.class); 
                 userVerifiedClaims = idaConnector.getVerifiedClaims(mappingModel.getConfig(), userSession.getUser().getUsername());
-            } else if (userSession.getUser() != null && userSession.getUser().getFirstAttribute(VERIFIED_CLAIMS) != null) {
+            } else if (userSession.getUser() != null) {
             // Retrieves user's verified claims from keycloak's database
 
-                userVerifiedClaims = mapper.readTree(userSession.getUser().getFirstAttribute(VERIFIED_CLAIMS));
-                try {
-                    VerifiedClaimsValidator.validateVerifiedClaims(userVerifiedClaims);
-                } catch (GenerationException | ValidationException e) {
-                    LOG.info("ERRO");
-
-                    userVerifiedClaims = null;
-                }
+                userVerifiedClaims = getVerifiedClaimsFromUserAttribute(userSession.getUser());
             }
 
             if (userVerifiedClaims == null || userVerifiedClaims.get(VERIFIED_CLAIMS) == null) {
@@ -332,6 +328,62 @@ public class IdaProtocolMapper extends AbstractOIDCProtocolMapper implements OID
             default:
                 return null;
         }
+    }
+
+    private JsonNode getVerifiedClaimsFromUserAttribute(UserModel user) {
+        if (user.getFirstAttribute(VERIFIED_CLAIMS) == null) {
+        // If the user does not have any verified claims registered
+
+            return null;
+        }
+
+        // The JsonNode that will be returned
+        ObjectMapper mapper = new ObjectMapper()
+            .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+            .enable(DeserializationFeature.FAIL_ON_READING_DUP_TREE_KEY);
+        ArrayNode userVerifiedClaims = mapper.createArrayNode();
+        
+        // Gets all verified claims that the user can have
+        List<String> verifiedClaimsStrings = user.getAttributeStream(VERIFIED_CLAIMS).collect(Collectors.toList());
+        
+        for (String verifiedClaimsString : verifiedClaimsStrings) {
+            JsonNode verifiedClaims;
+
+            try {
+                // Parses the verified_claims string
+                verifiedClaims = mapper.readTree(verifiedClaimsString);
+                // Validates the verified_claims object using the JSON schema
+                VerifiedClaimsValidator.validateVerifiedClaims(verifiedClaims);
+            } catch (JsonProcessingException e) {
+            // The verified_claims are not in a valid JSON format
+
+                LOG.info("The verified_claims are not in a valid JSON format");
+                continue;
+            } catch (ValidationException | GenerationException e) {
+            // The verified_claims are not in a valid verified_claims object format
+
+                LOG.info("The verified_claims are not in a valid verified_claims object format");
+                continue;
+            }
+
+            if (verifiedClaims.get(VERIFIED_CLAIMS) == null) {
+            // If verified claims cannot be found
+
+                continue;
+            }
+
+            if (verifiedClaims.get(VERIFIED_CLAIMS).isArray()) {
+            // If the verified_claims is a array, add each element to userVerifiedClaims
+
+                verifiedClaims.get(VERIFIED_CLAIMS).elements().forEachRemaining(entry -> userVerifiedClaims.add(entry));
+            } else {
+            // If the verified_claims is a single object, add it to userVerifiedClaims
+
+                userVerifiedClaims.add(verifiedClaims.get(VERIFIED_CLAIMS));
+            }
+        }
+
+        return mapper.createObjectNode().set(VERIFIED_CLAIMS, userVerifiedClaims);
     }
 
     @Override
