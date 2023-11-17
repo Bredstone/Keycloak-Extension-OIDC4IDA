@@ -13,8 +13,8 @@
         <keycloak.version>22.0.5</keycloak.version>
         <jackson.version>2.16.0-rc1</jackson.version>
         <jsonSchemaFriend.version>0.12.2</jsonSchemaFriend.version>
-        <java-jq.version>1.3.0</java-jq.version>
         <authlete-java-common.version>3.85</authlete-java-common.version>
+        <liquibase.version>4.25.0</liquibase.version>
         <maven.compiler.release>11</maven.compiler.release>
         <maven.compiler.source>11</maven.compiler.source>
         <maven.compiler.target>11</maven.compiler.target>
@@ -69,6 +69,13 @@
         </dependency>
 
         <dependency>
+            <groupId>org.keycloak</groupId>
+            <artifactId>keycloak-model-jpa</artifactId>
+            <version>${keycloak.version}</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
             <version>${jackson.version}</version>
@@ -81,16 +88,10 @@
         </dependency>
 
         <dependency>
-            <groupId>com.arakelian</groupId>
-            <artifactId>java-jq</artifactId>
-            <version>${java-jq.version}</version>
-        </dependency>
-
-        <dependency>
             <groupId>com.authlete</groupId>
             <artifactId>authlete-java-common</artifactId>
             <version>${authlete-java-common.version}</version>
-        </dependency>        
+        </dependency>
     </dependencies>
 
     <build>

@@ -2,6 +2,7 @@
     "realm": "OIDC4IDA",
     "displayName": "OpenID Connect for Identity Assurance 1.0",
     "enabled": true,
+    "defaultDefaultClientScopes" : [],
     "clients": [ {
         "clientId" : "ida-client",
         "name" : "IDA Client",
@@ -17,7 +18,7 @@
             "name": "IDA Mapper",
             "protocol": "openid-connect",
             "protocolMapper": "oidc-ida-mapper",
-            "consentRequired": false,
+            "consentRequired": true,
             "config": {
                 "id.token.claim": "true",
                 "access.token.claim": "true",
