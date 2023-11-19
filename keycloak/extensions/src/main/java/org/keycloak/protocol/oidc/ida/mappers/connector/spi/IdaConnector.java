@@ -14,7 +14,7 @@ import java.util.Map;
  */
 public interface IdaConnector extends Provider {
     String IDA_EXTERNAL_STORE_NAME = "ida.external.store";
-    String IDA_EXTERNAL_STORE_LABEL = "IDA external source";
+    String IDA_EXTERNAL_STORE_LABEL = "IDA external source's URL";
 
     /**
      * Add external store information to Protocolmapper
