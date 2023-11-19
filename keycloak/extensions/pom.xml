@@ -4,17 +4,16 @@
     xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>labsec</groupId>
+    <groupId>bredstone</groupId>
     <artifactId>keycloak-oidc4ida</artifactId>
     <version>0.0.1</version>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <keycloak.version>22.0.5</keycloak.version>
-        <jackson.version>2.16.0-rc1</jackson.version>
+        <jackson.version>2.15.3</jackson.version>
         <jsonSchemaFriend.version>0.12.2</jsonSchemaFriend.version>
         <authlete-java-common.version>3.85</authlete-java-common.version>
-        <liquibase.version>4.25.0</liquibase.version>
         <maven.compiler.release>11</maven.compiler.release>
         <maven.compiler.source>11</maven.compiler.source>
         <maven.compiler.target>11</maven.compiler.target>

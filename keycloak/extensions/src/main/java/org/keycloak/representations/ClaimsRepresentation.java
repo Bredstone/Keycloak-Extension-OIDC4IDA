@@ -21,36 +21,37 @@ package org.keycloak.representations;
 import java.util.List;
 import java.util.Map;
 
+import com.fasterxml.jackson.annotation.JsonAnyGetter;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.JsonNode;
 
 /**
  * Claims parameter as described in the OIDC specification https://openid.net/specs/openid-connect-core-1_0.html#ClaimsParameter
  *
  * @author <a href="mailto:mposolda@redhat.com">Marek Posolda</a>
  */
+@SuppressWarnings("rawtypes")
 public class ClaimsRepresentation {
-
     @JsonProperty("id_token")
-    private Map<String, Object> idTokenClaims;
+    private ClaimWrapper idTokenClaims;
 
     @JsonProperty("userinfo")
-    private Map<String, Object> userinfoClaims;
+    private ClaimWrapper userinfoClaims;
 
-    public Map<String, Object> getIdTokenClaims() {
+    public ClaimWrapper getIdTokenClaims() {
         return idTokenClaims;
     }
 
-    public void setIdTokenClaims(Map<String, Object> idTokenClaims) {
+    public void setIdTokenClaims(ClaimWrapper idTokenClaims) {
         this.idTokenClaims = idTokenClaims;
     }
 
-    public Map<String, Object> getUserinfoClaims() {
+    public ClaimWrapper getUserinfoClaims() {
         return userinfoClaims;
     }
 
-    public void setUserinfoClaims(Map<String, Object> userinfoClaims) {
+    public void setUserinfoClaims(ClaimWrapper userinfoClaims) {
         this.userinfoClaims = userinfoClaims;
     }
 
@@ -97,6 +98,7 @@ public class ClaimsRepresentation {
      * @param claimType claimType class
      * @return Claim value
      */
+    @SuppressWarnings("unchecked")
     public <CLAIM_TYPE> ClaimValue<CLAIM_TYPE> getClaimValue(String claimName, ClaimContext ctx, Class<CLAIM_TYPE> claimType) {
         if (!isPresent(claimName, ctx)) return null;
 
@@ -116,16 +118,55 @@ public class ClaimsRepresentation {
     /**
      * @param <CLAIM_TYPE> Specifies the type of the claim
      */
-    public static class ClaimValue<CLAIM_TYPE> {
+    public static class ClaimWrapper<CLAIM_TYPE> {
+        @JsonAnyGetter
+        @JsonAnySetter
+        private Map<String, ClaimValue<CLAIM_TYPE>> claims;
 
+        @JsonFormat(with = JsonFormat.Feature.ACCEPT_SINGLE_VALUE_AS_ARRAY)
+        private List<VerifiedClaims> verified_claims;
+
+        public Map<String, ClaimValue<CLAIM_TYPE>> getClaims() {
+            return claims;
+        }
+
+        public void setClaims(Map<String, ClaimValue<CLAIM_TYPE>> claims) {
+            this.claims = claims;
+        }
+
+        public List<VerifiedClaims> getVerified_claims() {
+            return verified_claims;
+        }
+
+        public void setVerified_claims(List<VerifiedClaims> verified_claims) {
+            this.verified_claims = verified_claims;
+        }
+
+        public boolean containsKey(String key) {
+            if (!key.equals("verified_claims"))
+                return claims != null && claims.containsKey(key);
+            else return verified_claims != null;
+        }
+
+        public ClaimValue<CLAIM_TYPE> get(String key) {
+            if (!key.equals("verified_claims") && claims != null)
+                return claims.get(key);
+            else return null;
+        }
+    }
+
+    /**
+     * @param <CLAIM_TYPE> Specifies the type of the claim
+     */
+    public static class ClaimValue<CLAIM_TYPE> {
+        @JsonProperty("essential")
         private Boolean essential;
 
+        @JsonProperty("value")
         private CLAIM_TYPE value;
 
+        @JsonProperty("values")
         private List<CLAIM_TYPE> values;
-
-        @JsonAnySetter
-        private JsonNode verified_claims;
 
         public Boolean getEssential() {
             return essential;
@@ -154,13 +195,27 @@ public class ClaimsRepresentation {
         public void setValues(List<CLAIM_TYPE> values) {
             this.values = values;
         }
+    }
 
-        public JsonNode getVerifiedClaims() {
-            return verified_claims;
+    public static class VerifiedClaims {
+        private Map<String, Object> verification;
+
+        private Map<String, Object> claims;
+
+        public Map<String, Object> getVerification() {
+            return verification;
         }
 
-        public void setVerifiedClaims(JsonNode verified_claims) {
-            this.verified_claims = verified_claims;
+        public void setVerification(Map<String, Object> verification) {
+            this.verification = verification;
+        }
+
+        public Map<String, Object> getClaims() {
+            return claims;
+        }
+
+        public void setClaims(Map<String, Object> claims) {
+            this.claims = claims;
         }
     }
 }

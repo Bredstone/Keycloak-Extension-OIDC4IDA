@@ -22,10 +22,12 @@ import java.net.UnknownHostException;
 import java.util.List;
 import java.util.Map;
 
-import static org.keycloak.protocol.oidc.ida.mappers.connector.IdaHttpConnectorConstants.ERROR_MESSAGE_IDA_EXTERNAL_STORE_CONNECTION;
-import static org.keycloak.protocol.oidc.ida.mappers.connector.IdaHttpConnectorConstants.ERROR_MESSAGE_IDA_EXTERNAL_STORE_JSON_STRUCTURE;
-import static org.keycloak.protocol.oidc.ida.mappers.connector.IdaHttpConnectorConstants.ERROR_MESSAGE_IDA_EXTERNAL_STORE_NOT_SPECIFIED;
-import static org.keycloak.protocol.oidc.ida.mappers.connector.IdaHttpConnectorConstants.ERROR_MESSAGE_IDA_EXTERNAL_STORE_SCHEMA_VALIDATION;
+import static org.keycloak.protocol.oidc.ida.mappers.connector.IdaHttpConnectorConstants.ERROR_MESSAGE_IDA_EXTERNAL_STORE_CONNECTION_EXCEPTION;
+import static org.keycloak.protocol.oidc.ida.mappers.connector.IdaHttpConnectorConstants.ERROR_MESSAGE_IDA_EXTERNAL_STORE_INVALID_SCHEMA;
+import static org.keycloak.protocol.oidc.ida.mappers.connector.IdaHttpConnectorConstants.ERROR_MESSAGE_IDA_EXTERNAL_STORE_INVALID_URL;
+import static org.keycloak.protocol.oidc.ida.mappers.connector.IdaHttpConnectorConstants.ERROR_MESSAGE_IDA_EXTERNAL_STORE_IVALID_JSON_;
+import static org.keycloak.protocol.oidc.ida.mappers.connector.IdaHttpConnectorConstants.ERROR_MESSAGE_IDA_EXTERNAL_STORE_URL_NOT_SPECIFIED;
+import static org.keycloak.protocol.oidc.ida.mappers.connector.IdaHttpConnectorConstants.IDA_EXTERNAL_STORE_HELP_TEXT;
 import static org.keycloak.validate.validators.NotBlankValidator.MESSAGE_BLANK;
 import static org.keycloak.validate.validators.UriValidator.MESSAGE_INVALID_URI;
 
@@ -34,9 +36,6 @@ import static org.keycloak.validate.validators.UriValidator.MESSAGE_INVALID_URI;
  */
 public class IdaHttpConnector implements IdaConnector {
     private static final Logger LOG = Logger.getLogger(IdaHttpConnector.class);
-
-    public static final String IDA_EXTERNAL_STORE_HELP_TEXT = "The URI of external store used by IDA (only if local source is disabled)";
-    public static final String ERROR_MESSAGE_INVALID_IDA_EXTERNAL_STORE = "Invalid URI of IDA external store.";
 
     @Override
     public void addIdaExternalStore(List<ProviderConfigProperty> configProperties) {
@@ -55,14 +54,15 @@ public class IdaHttpConnector implements IdaConnector {
         if (externalStoreUrl == null || externalStoreUrl.isEmpty()) {
         // If no URL was provided
 
-            throw new ProtocolMapperConfigException(ERROR_MESSAGE_IDA_EXTERNAL_STORE_NOT_SPECIFIED, MESSAGE_BLANK);
+            throw new ProtocolMapperConfigException(ERROR_MESSAGE_IDA_EXTERNAL_STORE_URL_NOT_SPECIFIED, MESSAGE_BLANK);
         }
 
         try {
-            // Validating the URL
-            new URI(externalStoreUrl).toURL();
+            new URI(externalStoreUrl).toURL(); // Validating the URL
         } catch (Exception e) {
-            throw new ProtocolMapperConfigException(ERROR_MESSAGE_INVALID_IDA_EXTERNAL_STORE, MESSAGE_INVALID_URI, e);
+        // The URL provided is invalid
+
+            throw new ProtocolMapperConfigException(ERROR_MESSAGE_IDA_EXTERNAL_STORE_INVALID_URL, MESSAGE_INVALID_URI, e);
         }
     }
 
@@ -89,11 +89,11 @@ public class IdaHttpConnector implements IdaConnector {
             if (e instanceof UnknownHostException || e instanceof HttpHostConnectException) {
             // If the external store couldn't be found
 
-                LOG.errorf(ERROR_MESSAGE_IDA_EXTERNAL_STORE_CONNECTION + " IDA External Store = '%s'", externalStoreUrl);
+                LOG.errorf(ERROR_MESSAGE_IDA_EXTERNAL_STORE_CONNECTION_EXCEPTION + " IDA External Store = '%s'", externalStoreUrl);
             } else if (e instanceof MismatchedInputException || e instanceof JsonParseException) {
             // If the user's verified_claims is not in a valid JSON structure
 
-                LOG.errorf(ERROR_MESSAGE_IDA_EXTERNAL_STORE_JSON_STRUCTURE);
+                LOG.errorf(ERROR_MESSAGE_IDA_EXTERNAL_STORE_IVALID_JSON_);
             }
 
             e.printStackTrace();
@@ -103,7 +103,7 @@ public class IdaHttpConnector implements IdaConnector {
         // These errors should not concern client applications
         // However, they will be logged into Keycloak's terminal, so admin could be aware that something is wrong
 
-            LOG.error(ERROR_MESSAGE_IDA_EXTERNAL_STORE_SCHEMA_VALIDATION);
+            LOG.error(ERROR_MESSAGE_IDA_EXTERNAL_STORE_INVALID_SCHEMA);
 
             e.printStackTrace();
             return null;
@@ -112,5 +112,6 @@ public class IdaHttpConnector implements IdaConnector {
 
     @Override
     public void close() {
+        // NOOP
     }
 }

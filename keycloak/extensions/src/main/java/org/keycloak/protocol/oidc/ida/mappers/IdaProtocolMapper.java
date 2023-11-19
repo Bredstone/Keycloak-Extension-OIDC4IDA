@@ -44,13 +44,15 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import static org.keycloak.protocol.oidc.ida.mappers.IdaConstants.CLAIMS;
-import static org.keycloak.protocol.oidc.ida.mappers.IdaConstants.ERROR_MESSAGE_CLAIMS_EMPTY;
 import static org.keycloak.protocol.oidc.ida.mappers.IdaConstants.ERROR_MESSAGE_REQUESTED_CLAIMS_EMPTY;
-import static org.keycloak.protocol.oidc.ida.mappers.IdaConstants.ERROR_MESSAGE_REQUESTED_CLAIMS_MALFORMED;
-import static org.keycloak.protocol.oidc.ida.mappers.IdaConstants.ERROR_MESSAGE_REQUESTED_CLAIMS_TOKEN_TYPE;
-import static org.keycloak.protocol.oidc.ida.mappers.IdaConstants.ERROR_MESSAGE_REQUESTED_VERIFIED_CLAIMS_MALFORMED;
+import static org.keycloak.protocol.oidc.ida.mappers.IdaConstants.ERROR_MESSAGE_REQUESTED_CLAIMS_INVALID_JSON;
+import static org.keycloak.protocol.oidc.ida.mappers.IdaConstants.ERROR_MESSAGE_REQUESTED_CLAIMS_NOT_REQUESTED;
+import static org.keycloak.protocol.oidc.ida.mappers.IdaConstants.ERROR_MESSAGE_REQUESTED_VERIFIED_CLAIMS_CLAIMS_EMPTY;
+import static org.keycloak.protocol.oidc.ida.mappers.IdaConstants.ERROR_MESSAGE_REQUESTED_VERIFIED_CLAIMS_INVALID_SCHEMA;
 import static org.keycloak.protocol.oidc.ida.mappers.IdaConstants.ERROR_MESSAGE_REQUESTED_VERIFIED_CLAIMS_NOT_REQUESTED;
 import static org.keycloak.protocol.oidc.ida.mappers.IdaConstants.ERROR_MESSAGE_USER_VERIFIED_CLAIMS_EMPTY;
+import static org.keycloak.protocol.oidc.ida.mappers.IdaConstants.ERROR_MESSAGE_USER_VERIFIED_CLAIMS_INVALID_JSON;
+import static org.keycloak.protocol.oidc.ida.mappers.IdaConstants.ERROR_MESSAGE_USER_VERIFIED_CLAIMS_INVALID_SCHEMA;
 import static org.keycloak.protocol.oidc.ida.mappers.IdaConstants.ERROR_MESSAGE_VERIFIED_CLAIMS_EMPTY;
 import static org.keycloak.protocol.oidc.ida.mappers.IdaConstants.IDA_LOCAL_SOURCE_HELP_TEXT;
 import static org.keycloak.protocol.oidc.ida.mappers.IdaConstants.IDA_LOCAL_SOURCE_LABEL;
@@ -73,6 +75,7 @@ public class IdaProtocolMapper extends AbstractOIDCProtocolMapper implements OID
     private static final String PROVIDER_ID = "oidc-ida-mapper";
     private static final Logger LOG = Logger.getLogger(IdaProtocolMapper.class);
 
+    // Provider configs
     private static final List<ProviderConfigProperty> configProperties = new ArrayList<>();
     static {
         OIDCAttributeMapperHelper.addIncludeInTokensConfig(configProperties, IdaProtocolMapper.class);
@@ -155,28 +158,27 @@ public class IdaProtocolMapper extends AbstractOIDCProtocolMapper implements OID
                 .enable(DeserializationFeature.FAIL_ON_READING_DUP_TREE_KEY);
             JsonNode requestedClaims = mapper.readTree(requestedString);
 
-            // Current token type (userinfo or id_token)
-            String curEndpointKey = getEndpointKey(token.getType());
+            String curEndpointKey = getEndpointKey(token.getType()); // Current token type (userinfo or id_token)
             if (requestedClaims.get(curEndpointKey) == null) {
             // If the current token is not of a requested type, return
 
-                LOG.debugf(ERROR_MESSAGE_REQUESTED_CLAIMS_TOKEN_TYPE, curEndpointKey);
+                LOG.debugf(ERROR_MESSAGE_REQUESTED_CLAIMS_NOT_REQUESTED, curEndpointKey);
             
                 return;
             }
 
-            // The requested verified_claims JSON object
+            // Gets the requested verified_claims JSON object
             JsonNode requestedVerifiedClaims = requestedClaims.get(curEndpointKey).get(VERIFIED_CLAIMS);
 
             if (requestedVerifiedClaims == null) {
-            // If there were no verified claims requested, return
+            // If no verified claims were requested, return
 
                 LOG.debug(ERROR_MESSAGE_REQUESTED_VERIFIED_CLAIMS_NOT_REQUESTED);
                 
                 return;
             }
 
-            // Asserts that every claims sub-element is not null 
+            // Asserts that every "claims" sub-element is not null 
             assertClaimsNotEmpty(
                 requestedVerifiedClaims.isArray() 
                     ? mapper.convertValue(requestedVerifiedClaims, List.class) 
@@ -239,11 +241,15 @@ public class IdaProtocolMapper extends AbstractOIDCProtocolMapper implements OID
                 OIDCAttributeMapperHelper.mapClaim(token, mappingModel, extractedClaims.get(0));
             }
         } catch (JsonProcessingException e) {
-            LOG.warn(ERROR_MESSAGE_REQUESTED_CLAIMS_MALFORMED);
+        // The requested claims are not in a valid JSON format
+
+            LOG.warn(ERROR_MESSAGE_REQUESTED_CLAIMS_INVALID_JSON);
 
             return;
         } catch (GenerationException | ValidationException e) {
-            LOG.warn(ERROR_MESSAGE_REQUESTED_VERIFIED_CLAIMS_MALFORMED);
+        // The requested verified claims are not in a valid verified_claims JSON format
+
+            LOG.warn(ERROR_MESSAGE_REQUESTED_VERIFIED_CLAIMS_INVALID_SCHEMA);
             LOG.warn(e.getMessage());
 
             return;
@@ -285,7 +291,7 @@ public class IdaProtocolMapper extends AbstractOIDCProtocolMapper implements OID
     }
 
     /**
-     * Inspects each verified_claims object and assure that the claims sub-element is not empty
+     * Inspects each "verified_claims" object and assure that the "claims" sub-element is not empty
      * 
      * @param verifiedClaims
      */
@@ -303,10 +309,10 @@ public class IdaProtocolMapper extends AbstractOIDCProtocolMapper implements OID
         if (claims != null && claims instanceof Map && ((Map<String, Object>) claims).isEmpty()) {
         // If the claims sub-element is empty, abort the transaction with an invalid_request error
 
-            LOG.debug(ERROR_MESSAGE_CLAIMS_EMPTY);
+            LOG.debug(ERROR_MESSAGE_REQUESTED_VERIFIED_CLAIMS_CLAIMS_EMPTY);
             
             throw new ErrorResponseException(OAuthErrorException.INVALID_REQUEST, 
-                ERROR_MESSAGE_CLAIMS_EMPTY, 
+                ERROR_MESSAGE_REQUESTED_VERIFIED_CLAIMS_CLAIMS_EMPTY, 
                 Response.Status.BAD_REQUEST);
         }
     }
@@ -330,6 +336,14 @@ public class IdaProtocolMapper extends AbstractOIDCProtocolMapper implements OID
         }
     }
 
+    /**
+     * Gets the verified claims from user's attributes. The default verified claims attribute's name is 
+     * "verified_claims". It should have a JSON string containing one or more verified claims elements. It is also 
+     * possible to have multiple "verified_claims" attributes, each one with a different verified claims JSON.
+     *   
+     * @param user
+     * @return
+     */
     private JsonNode getVerifiedClaimsFromUserAttribute(UserModel user) {
         if (user.getFirstAttribute(VERIFIED_CLAIMS) == null) {
         // If the user does not have any verified claims registered
@@ -343,26 +357,27 @@ public class IdaProtocolMapper extends AbstractOIDCProtocolMapper implements OID
             .enable(DeserializationFeature.FAIL_ON_READING_DUP_TREE_KEY);
         ArrayNode userVerifiedClaims = mapper.createArrayNode();
         
-        // Gets all verified claims that the user can have
+        // Gets all user's verified_claims attributes
         List<String> verifiedClaimsStrings = user.getAttributeStream(VERIFIED_CLAIMS).collect(Collectors.toList());
-        
         for (String verifiedClaimsString : verifiedClaimsStrings) {
+        // For each verified_claim
+
             JsonNode verifiedClaims;
 
             try {
                 // Parses the verified_claims string
                 verifiedClaims = mapper.readTree(verifiedClaimsString);
-                // Validates the verified_claims object using the JSON schema
+                // Validates the verified_claims object using a JSON schema
                 VerifiedClaimsValidator.validateVerifiedClaims(verifiedClaims);
             } catch (JsonProcessingException e) {
             // The verified_claims are not in a valid JSON format
 
-                LOG.info("The verified_claims are not in a valid JSON format");
+                LOG.info(ERROR_MESSAGE_USER_VERIFIED_CLAIMS_INVALID_JSON);
                 continue;
             } catch (ValidationException | GenerationException e) {
             // The verified_claims are not in a valid verified_claims object format
 
-                LOG.info("The verified_claims are not in a valid verified_claims object format");
+                LOG.info(ERROR_MESSAGE_USER_VERIFIED_CLAIMS_INVALID_SCHEMA);
                 continue;
             }
 

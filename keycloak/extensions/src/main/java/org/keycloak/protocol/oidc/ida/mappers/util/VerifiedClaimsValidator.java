@@ -17,11 +17,17 @@ import net.jimblackler.jsonschemafriend.Validator;
 
 import static net.jimblackler.jsonschemafriend.StreamUtils.streamToString;
 
+import static org.keycloak.protocol.oidc.ida.mappers.util.VerifiedClaimsValidatorConstants.ERROR_MESSAGE_REQUEST_SCHEMA_NOT_FOUND; 
+import static org.keycloak.protocol.oidc.ida.mappers.util.VerifiedClaimsValidatorConstants.ERROR_MESSAGE_VERIFIED_CLAIMS_SCHEMA_NOT_FOUND;
+import static org.keycloak.protocol.oidc.ida.mappers.util.VerifiedClaimsValidatorConstants.REQUEST_SCHEMA_PATH;
+import static org.keycloak.protocol.oidc.ida.mappers.util.VerifiedClaimsValidatorConstants.SCHEMA_PATH;
+import static org.keycloak.protocol.oidc.ida.mappers.util.VerifiedClaimsValidatorConstants.VERIFIED_CLAIMS_SCHEMA_PATH;
+
 public class VerifiedClaimsValidator {
     private static final Logger LOG = Logger.getLogger(VerifiedClaimsValidator.class);
 
     /**
-     * Validates a JSON verified_claims object
+     * Validates a JSON "verified_claims" object
      * 
      * @param verifiedClaims
      * @throws GenerationException
@@ -29,20 +35,19 @@ public class VerifiedClaimsValidator {
      */
     public static void validateVerifiedClaims(JsonNode verifiedClaims) throws ValidationException, GenerationException {
         try {
-            JsonNode schema = new ObjectMapper().readTree(VerifiedClaimsValidator.class.getResourceAsStream("/schema/verified_claims.json"));
+            JsonNode schema = new ObjectMapper().readTree(VerifiedClaimsValidator.class.getResourceAsStream(VERIFIED_CLAIMS_SCHEMA_PATH));
 
             validateJson(verifiedClaims, schema);
         } catch (IOException e) {
-            // This shouldn't happen
+        // This shouldn't happen
 
-            LOG.error("Verified claims request's schema file not found!");
-
+            LOG.error(ERROR_MESSAGE_VERIFIED_CLAIMS_SCHEMA_NOT_FOUND);
             e.printStackTrace();
         }
     }
 
     /**
-     * Validates a JSON verified_claims request
+     * Validates a JSON "verified_claims" request
      * 
      * @param requestedVerifiedClaims
      * @throws GenerationException
@@ -50,14 +55,13 @@ public class VerifiedClaimsValidator {
      */
     public static void validateVerifiedClaimsRequest(JsonNode requestedVerifiedClaims) throws ValidationException, GenerationException {
         try {
-            JsonNode schema = new ObjectMapper().readTree(VerifiedClaimsValidator.class.getResourceAsStream("/schema/verified_claims_request.json"));
+            JsonNode schema = new ObjectMapper().readTree(VerifiedClaimsValidator.class.getResourceAsStream(REQUEST_SCHEMA_PATH));
 
             validateJson(requestedVerifiedClaims, schema);
         } catch (IOException e) {
-            // This shouldn't happen
+        // This shouldn't happen
 
-            LOG.error("Verified claims request's schema file not found!");
-
+            LOG.error(ERROR_MESSAGE_REQUEST_SCHEMA_NOT_FOUND);
             e.printStackTrace();
         }
     }
@@ -80,7 +84,7 @@ public class VerifiedClaimsValidator {
                 String fileName = path[path.length - 1];
 
                 // Load and return the specified file
-                return streamToString(VerifiedClaimsValidator.class.getResourceAsStream("/schema/" + fileName));
+                return streamToString(VerifiedClaimsValidator.class.getResourceAsStream(SCHEMA_PATH + fileName));
             }
         };
 

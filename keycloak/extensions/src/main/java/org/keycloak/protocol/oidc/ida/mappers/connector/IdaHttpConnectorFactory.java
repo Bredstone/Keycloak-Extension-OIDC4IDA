@@ -7,7 +7,6 @@ import org.keycloak.protocol.oidc.ida.mappers.connector.spi.IdaConnector;
 import org.keycloak.protocol.oidc.ida.mappers.connector.spi.IdaConnectorFactory;
 
 public class IdaHttpConnectorFactory implements IdaConnectorFactory {
-
     private static final String PROVIDER_ID = "ida-http-connector";
 
     @Override
