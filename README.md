@@ -6,7 +6,7 @@ Most of the magic happens thanks to `authlete-java-common` library (the document
 ## 🛠️ Usage
 To utilize this extension and its functionalities, follow these steps:
 
-1. Copy the file `keycloak/extensions/keycloak-oidc4ida.jar` into the `providers/` directory of your Keycloak installation.
+1. Copy the file `/keycloak/extensions/keycloak-oidc4ida.jar` into the `/providers` directory of your Keycloak installation.
 
 1. Upon server initialization, a new protocol mapper should become available: ![Screenshot of Keycloak's interface, depicting the new OIDC4IDA protocol mapper.](images/protocol-mapper.png)
 
@@ -24,6 +24,23 @@ chmod +x dev.sh
 ```
 
 [Postman](https://www.postman.com/) can be used to actively send verified claims requests and receive responses. A [collection file](requests/postman/OIDC4IDA.postman_collection.json) is also provided, with a set of request examples and a pre-configured environment for you to play around.
+
+## 🚧 Building from source
+This project is designed to be customizable at your will. The entire source code is thoroughly documented and can be easily modified to suit your needs. To build the project after making changes, follow these steps:
+
+### Building with maven
+Navigate to the `/keycloak/extensions` directory and execute the following command in a terminal:
+```bash
+mvn clean install
+```
+This command will build the project, and a new JAR file will be generated in the `/keycloak/extensions` directory.
+
+### Building with demo
+Alternatively, you can use the demo environment for building and testing your changes. To do so, run the following command in a terminal:
+```bash
+./dev.sh run --mvn-compile
+```
+This command will compile the project within the demo environment and also create a new JAR file in the `/keycloak/extensions` directory.
 
 ## ⚠️ Attention
 In order to be able to store users' verified claims locally, Keycloak's database had to be modified. This is done automatically when the extension is loaded, and should cause no problems at all. The `USER_ATTRIBUTE` table has had its column `VALUE` length changed from `255` to `MAX`. This modification should be handled with care, and it is recommended to do a backup of your application's database before loading the extension.
